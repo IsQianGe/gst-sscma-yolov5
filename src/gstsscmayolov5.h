@@ -48,19 +48,63 @@
 #define __GST_SSCMAYOLOV5_H__
 
 #include <gst/gst.h>
+#include <gst/base/gstbasetransform.h>
+#include <gst/video/video-info.h>
+#include "tensor_info.h"
+#include <net.h>
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_SSCMAYOLOV5 (gst_sscma_yolov5_get_type())
-G_DECLARE_FINAL_TYPE (GstSscmaYolov5, gst_sscma_yolov5,
-    GST, SSCMAYOLOV5, GstElement)
+#ifndef UNUSED
+#define UNUSED(expr) do { (void)(expr); } while (0)
+#endif
+
+#define GST_TYPE_SSCMAYOLOV5 \
+  (gst_sscma_yolov5_get_type())
+#define GST_SWIFT_YOLOV5(obj) \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_SSCMAYOLOV5,GstSscmaYolov5))
+#define GST_SWIFT_YOLOV5_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_SSCMAYOLOV5,GstSscmaYolov5Class))
+#define GST_IS_SWIFT_YOLOV5(obj) \
+  (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_SSCMAYOLOV5))
+#define GST_IS_SWIFT_YOLOV5_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_SSCMAYOLOV5))
+#define GST_SWIFT_YOLOV5_CAST(obj)  ((GstSscmaYolov5 *)(obj))
+
+#define GST_TENSOR_CAP_DEFAULT \
+    "other/tensor" ", " \
+    "framerate = (fraction) [ 0, max ]"
+
+/**
+ * @brief Caps string for supported video format
+ */
+#define VIDEO_CAPS_STR \
+    GST_VIDEO_CAPS_MAKE ("{ RGB, BGR, RGBx, BGRx, xRGB, xBGR, RGBA, BGRA, ARGB, ABGR, GRAY8, GRAY16_BE, GRAY16_LE }") \
+    ", interlace-mode = (string) progressive"
+
+#define append_video_caps_template(caps) \
+    gst_caps_append (caps, gst_caps_from_string (VIDEO_CAPS_STR))
 
 typedef struct _GstSscmaYolov5 GstSscmaYolov5;
+typedef struct _GstSscmaYolov5Class GstSscmaYolov5Class;
+
+/**
+ * @brief GstSscmaYolov5Class inherits GstBaseTransformClass.
+ *
+ * Referring another child (sibiling), GstVideoFilter (abstract class) and
+ * its child (concrete class) GstVideoConverter.
+ * Note that GstSscmaYolov5Class is a concrete class; thus we need to look at both.
+ */
+struct _GstSscmaYolov5Class
+{
+  GstBaseTransformClass parent_class;   /**< Inherits GstBaseTransformClass */
+};
+
 /**
  * @brief GstMode's properties for NN framework (internal data structure)
  *
- * Because custom filters of tensor_filter may need to access internal data
- * of GstTensorFilter, we define this data structure here.
+ * Because custom filters of sscma_yolov5 may need to access internal data
+ * of GstSscmaYolov5, we define this data structure here.
  */
 typedef struct _GstSscmaYolov5Properties
 {
@@ -69,20 +113,13 @@ typedef struct _GstSscmaYolov5Properties
 
   int input_configured; /**< TRUE if input tensor is configured. Use int instead of gboolean because this is refered by custom plugins. */
   GstTensorsInfo input_meta; /**< configured input tensor info */
-  tensors_layout input_layout; /**< data layout info provided as a property to tensor_filter for the input, defaults to _NNS_LAYOUT_ANY for all the tensors */
+  tensors_layout input_layout; /**< data layout info provided as a property to sscma_yolov5 for the input, defaults to _NNS_LAYOUT_ANY for all the tensors */
   unsigned int input_ranks[NNS_TENSOR_SIZE_LIMIT + NNS_TENSOR_SIZE_EXTRA_LIMIT];  /**< the rank list of input tensors, it is calculated based on the dimension string. */
 
   int output_configured; /**< TRUE if output tensor is configured. Use int instead of gboolean because this is refered by custom plugins. */
   GstTensorsInfo output_meta; /**< configured output tensor info */
-  tensors_layout output_layout; /**< data layout info provided as a property to tensor_filter for the output, defaults to _NNS_LAYOUT_ANY for all the tensors */
+  tensors_layout output_layout; /**< data layout info provided as a property to sscma_yolov5 for the output, defaults to _NNS_LAYOUT_ANY for all the tensors */
   unsigned int output_ranks[NNS_TENSOR_SIZE_LIMIT + NNS_TENSOR_SIZE_EXTRA_LIMIT];  /**< the rank list of output tensors, it is calculated based on the dimension string. */
-
-  const char *custom_properties; /**< sub-plugin specific custom property values in string */
-  accl_hw *hw_list; /**< accelerators supported by framework intersected with user provided accelerator preference, use in GstTensorFilterFramework V1 only */
-  int num_hw;       /**< number of hardare accelerators in the hw_list supported by the framework */
-  const char *accl_str; /**< accelerator configuration passed in as parameter, use in GstTensorFilterFramework V0 only */
-  char *shared_tensor_filter_key; /**< the shared instance key to use same model representation */
-
 } GstSscmaYolov5Properties;
 
 
@@ -92,8 +129,12 @@ struct _GstSscmaYolov5
 
   GstPad *sinkpad, *srcpad;
 
-  gboolean silent;
+  ncnn::Net net;
 
+  gsize frame_size; /**< size of one frame */
+  int rate_n; /**< framerate is in fraction, which is numerator/denominator */
+  int rate_d; /**< framerate is in fraction, which is numerator/denominator */
+  
   GstSscmaYolov5Properties prop; /**< NNFW plugin's properties */
 };
 
