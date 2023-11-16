@@ -164,4 +164,13 @@ guint gst_tensor_parse_dimension (const gchar * dimstr, tensor_dim dim);
 void gst_tensors_layout_init (tensors_layout layout);
 void gst_tensors_rank_init (unsigned int ranks[]);
 
+/**
+ * raster[ch][12] is the top pixels
+ * raster[ch][0] is the bottom pixels
+ * raster[ch][height] & 0xF0 is the left-hand side
+ * raster[ch][height] & 0x0F is the right-hand size
+ */
+
+extern uint8_t rasters[][13];
+
 #endif /* __GST_TENSOE_INFO_H__ */

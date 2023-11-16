@@ -85,11 +85,28 @@ G_BEGIN_DECLS
 #define append_video_caps_template(caps) \
     gst_caps_append (caps, gst_caps_from_string (VIDEO_CAPS_STR))
 
+#define DETECTION_NUM_INFO 5
+#define PIXEL_VALUE                             (0xFF) 
+
+/** @brief Represents a detect object */
+typedef struct
+{
+  int valid;
+  int class_id;
+  int x;
+  int y;
+  int width;
+  int height;
+  gfloat prob;
+
+  int tracking_id;
+} detectedObject;
+
 typedef struct _GstSscmaYolov5 GstSscmaYolov5;
 typedef struct _GstSscmaYolov5Class GstSscmaYolov5Class;
 
 /**
- * @brief GstSscmaYolov5Class inherits GstBaseTransformClass.
+ * @brief GstSscmaYolov5Class inherits GstElementClass.
  *
  * Referring another child (sibiling), GstVideoFilter (abstract class) and
  * its child (concrete class) GstVideoConverter.
@@ -97,7 +114,7 @@ typedef struct _GstSscmaYolov5Class GstSscmaYolov5Class;
  */
 struct _GstSscmaYolov5Class
 {
-  GstBaseTransformClass parent_class;   /**< Inherits GstBaseTransformClass */
+  GstElementClass parent_class;   /**< Inherits GstElementClass */
 };
 
 /**
@@ -111,6 +128,10 @@ typedef struct _GstSscmaYolov5Properties
   const char **model_files; /**< Filepath to the model file (as an argument for NNFW). char instead of gchar for non-glib custom plugins */
   int num_models; /**< number of model files. Some frameworks need multiple model files to initialize the graph (caffe, caffe2) */
 
+  char **labels; /**< The list of loaded labels. Null if not loaded */
+  uint total_labels; /**< The number of loaded labels */
+  uint max_word_length; /**< The max size of labels */
+
   int input_configured; /**< TRUE if input tensor is configured. Use int instead of gboolean because this is refered by custom plugins. */
   GstTensorsInfo input_meta; /**< configured input tensor info */
   tensors_layout input_layout; /**< data layout info provided as a property to sscma_yolov5 for the input, defaults to _NNS_LAYOUT_ANY for all the tensors */
@@ -122,16 +143,14 @@ typedef struct _GstSscmaYolov5Properties
   unsigned int output_ranks[NNS_TENSOR_SIZE_LIMIT + NNS_TENSOR_SIZE_EXTRA_LIMIT];  /**< the rank list of output tensors, it is calculated based on the dimension string. */
 } GstSscmaYolov5Properties;
 
-
 struct _GstSscmaYolov5
 {
   GstElement element;
 
   GstPad *sinkpad, *srcpad;
 
-  ncnn::Net net;
+  ncnn::Net net; /**< NNFW's net object */
 
-  gsize frame_size; /**< size of one frame */
   int rate_n; /**< framerate is in fraction, which is numerator/denominator */
   int rate_d; /**< framerate is in fraction, which is numerator/denominator */
   

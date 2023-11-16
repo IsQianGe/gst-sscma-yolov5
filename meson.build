@@ -29,7 +29,7 @@ gst_video_dep = dependency('gstreamer-video-1.0')
 # The sscmayolov5 Plugin
  gstsscmayolov5_sources = [
   'src/gstsscmayolov5.cc',
-  'src/tensor_info.cc',
+  'src/tensor_info.cc'
   ]
 
 # The sscmayolov5 include directories
